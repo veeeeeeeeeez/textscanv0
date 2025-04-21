@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: text-scanner-api
+    env: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: chrome-extension://* 
