@@ -23,7 +23,7 @@ const config = {
     },
     // Production - Update this with your Render URL
     production: {
-        apiUrl: 'https://text-scanner-api.onrender.com' // Your Render URL will be different
+        apiUrl: 'https://text-scanner-api.onrender.com'
     }
 };
 
