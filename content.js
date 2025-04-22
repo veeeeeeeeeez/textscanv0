@@ -371,4 +371,30 @@ async function showDefinitionPopup(text, range) {
             </div>
         `);
     }
+}
+
+async function getExplanation(text) {
+    try {
+        const response = await fetch(`${config.apiUrl}/explain`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ text })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get explanation');
+        }
+
+        const data = await response.json();
+        if (!data.explanation) {
+            throw new Error('No explanation received');
+        }
+
+        return data.explanation;
+    } catch (error) {
+        console.error('Error getting explanation:', error);
+        throw new Error('Unable to get explanation. Please try again.');
+    }
 } 
