@@ -256,125 +256,27 @@ async function getAIExplanation(text) {
     return data.choices[0].message.content;
 }
 
-// Function to create and show popup
-async function showDefinitionPopup(text, range) {
-    // Remove existing popup
-    if (definitionPopup) {
-        definitionPopup.remove();
-    }
-
-    // Create new popup
-    definitionPopup = document.createElement('div');
-    definitionPopup.className = 'definition-popup';
-    
-    // Show initial loading state
-    definitionPopup.innerHTML = `
-        <div class="loading">Looking up meaning...</div>
-    `;
-
-    // Position popup
-    const rect = range.getBoundingClientRect();
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
-    
-    definitionPopup.style.left = `${scrollX + rect.left + (rect.width / 2)}px`;
-    definitionPopup.style.top = `${scrollY + rect.top - 10}px`;
-    definitionPopup.style.transform = 'translate(-50%, -100%)';
-    
-    document.body.appendChild(definitionPopup);
-    
-    // Adjust position if too close to top
-    const popupRect = definitionPopup.getBoundingClientRect();
-    if (popupRect.top < 10) {
-        definitionPopup.style.top = `${scrollY + rect.bottom + 10}px`;
-        definitionPopup.style.transform = 'translate(-50%, 0)';
-        definitionPopup.classList.add('above');
-    }
-
-    async function updatePopupContent(content) {
-        if (definitionPopup) {
-            definitionPopup.innerHTML = content;
-        }
-    }
-
+// Function to check server health
+async function checkServerHealth() {
     try {
-        if (isSingleWord(text)) {
-            // Try dictionary first
-            const dictResult = await getDefinition(text);
-            
-            if (dictResult) {
-                await updatePopupContent(`
-                    <div class="word">
-                        ${text}
-                        <span class="type">${dictResult.type}</span>
-                    </div>
-                    <p class="definition">${dictResult.definition}</p>
-                    <div class="source">Source: Dictionary</div>
-                `);
-            } else {
-                // Dictionary failed, show AI loading state
-                await updatePopupContent(`
-                    <div class="word">${text}</div>
-                    <div class="loading">Getting AI explanation...</div>
-                `);
-                
-                try {
-                    const aiExplanation = await getAIExplanation(text);
-                    await updatePopupContent(`
-                        <div class="word">${text}</div>
-                        <p class="ai-explanation">${aiExplanation}</p>
-                        <div class="source">Source: AI Assistant</div>
-                    `);
-                } catch (aiError) {
-                    await updatePopupContent(`
-                        <div class="word">${text}</div>
-                        <p class="error">${aiError.message}</p>
-                        <div class="debug-info">
-                            API Key Set: ${config.OPENAI_API_KEY ? 'Yes' : 'No'}
-                            Model: ${config.AI_MODEL}
-                        </div>
-                    `);
-                }
-            }
-        } else {
-            // For phrases, go straight to AI
-            await updatePopupContent(`
-                <div class="word">Getting AI explanation...</div>
-                <div class="loading"></div>
-            `);
-            
-            try {
-                const aiExplanation = await getAIExplanation(text);
-                await updatePopupContent(`
-                    <div class="word">Phrase Analysis</div>
-                    <p class="ai-explanation">${aiExplanation}</p>
-                    <div class="source">Source: AI Assistant</div>
-                `);
-            } catch (error) {
-                await updatePopupContent(`
-                    <div class="word">Phrase Analysis</div>
-                    <p class="error">${error.message}</p>
-                    <div class="debug-info">
-                        API Key Set: ${config.OPENAI_API_KEY ? 'Yes' : 'No'}
-                        Model: ${config.AI_MODEL}
-                    </div>
-                `);
-            }
-        }
+        const response = await fetch(`${config.apiUrl}/health`);
+        const data = await response.json();
+        return data.status === 'ok';
     } catch (error) {
-        await updatePopupContent(`
-            <div class="word">${text}</div>
-            <p class="error">Unexpected error: ${error.message}</p>
-            <div class="debug-info">
-                API Key Set: ${config.OPENAI_API_KEY ? 'Yes' : 'No'}
-                Model: ${config.AI_MODEL}
-            </div>
-        `);
+        console.error('Server health check failed:', error);
+        return false;
     }
 }
 
+// Function to get explanation with server check
 async function getExplanation(text) {
     try {
+        // Check server health first
+        const isServerHealthy = await checkServerHealth();
+        if (!isServerHealthy) {
+            throw new Error('Server is not responding. Please try again in a moment.');
+        }
+
         const response = await fetch(`${config.apiUrl}/explain`, {
             method: 'POST',
             headers: {
@@ -395,6 +297,54 @@ async function getExplanation(text) {
         return data.explanation;
     } catch (error) {
         console.error('Error getting explanation:', error);
-        throw new Error('Unable to get explanation. Please try again.');
+        throw new Error(error.message || 'Unable to get explanation. Please try again.');
+    }
+}
+
+// Function to create and show popup
+async function showDefinitionPopup(text, range) {
+    if (definitionPopup) {
+        definitionPopup.remove();
+    }
+
+    definitionPopup = document.createElement('div');
+    definitionPopup.className = 'definition-popup';
+    
+    definitionPopup.innerHTML = `
+        <div class="loading">Getting explanation...</div>
+    `;
+
+    const rect = range.getBoundingClientRect();
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    
+    definitionPopup.style.left = `${scrollX + rect.left + (rect.width / 2)}px`;
+    definitionPopup.style.top = `${scrollY + rect.top - 10}px`;
+    definitionPopup.style.transform = 'translate(-50%, -100%)';
+    
+    document.body.appendChild(definitionPopup);
+    
+    const popupRect = definitionPopup.getBoundingClientRect();
+    if (popupRect.top < 10) {
+        definitionPopup.style.top = `${scrollY + rect.bottom + 10}px`;
+        definitionPopup.style.transform = 'translate(-50%, 0)';
+        definitionPopup.classList.add('above');
+    }
+
+    try {
+        const explanation = await getExplanation(text);
+        if (definitionPopup) {
+            definitionPopup.innerHTML = `
+                <div class="word">Text Analysis</div>
+                <p class="ai-explanation">${explanation}</p>
+            `;
+        }
+    } catch (error) {
+        if (definitionPopup) {
+            definitionPopup.innerHTML = `
+                <div class="word">Error</div>
+                <p class="error">${error.message}</p>
+            `;
+        }
     }
 } 
